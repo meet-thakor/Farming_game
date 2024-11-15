@@ -16,6 +16,7 @@ GREEN = (34, 177, 76)
 BROWN = (139, 69, 19)
 BLUE = (0, 0, 255)
 BLACK = (0, 0, 0)
+DARK_GRAY = (64, 64, 64)
 
 # Set up colors for different crop states
 CROP_COLORS = {
@@ -39,6 +40,19 @@ pygame.display.set_caption("2D Farming Game")
 # Fonts for text
 font = pygame.font.SysFont("Arial", 24)
 small_font = pygame.font.SysFont("Arial", 16)
+
+# Tool icons (we'll use basic rectangles as placeholders)
+TOOL_ICONS = {
+    "fertilizer": pygame.Surface((40, 40)),
+    "water_can": pygame.Surface((40, 40)),
+    "wheat": pygame.Surface((40, 40)),
+    "harvest": pygame.Surface((40, 40))
+}
+
+TOOL_ICONS["fertilizer"].fill(BROWN)
+TOOL_ICONS["water_can"].fill(BLUE)
+TOOL_ICONS["wheat"].fill(YELLOW := (255, 255, 0))
+TOOL_ICONS["harvest"].fill(ORANGE := (255, 165, 0))
 
 # Crop class to represent a crop in the game
 class Crop:
@@ -155,42 +169,59 @@ def game_loop():
     farm = Farm()
     clock = pygame.time.Clock()
     running = True
-    selected_crop = "wheat"
+    selected_tool = "fertilizer"  # Default tool
+    dragging_tool = None
     mouse_x, mouse_y = 0, 0
 
     while running:
         screen.fill(GREEN)  # Set the background color
 
-        # Get mouse position
-        mouse_x, mouse_y = pygame.mouse.get_pos()
-        grid_x, grid_y = min(mouse_x // CELL_SIZE, GRID_WIDTH - 1), min(mouse_y // CELL_SIZE, GRID_HEIGHT - 1)
-
         # Draw the farm grid
         farm.draw(screen)
+
+        # Draw the sidebar
+        pygame.draw.rect(screen, DARK_GRAY, pygame.Rect(0, 0, 120, SCREEN_HEIGHT))  # Sidebar
+        screen.blit(TOOL_ICONS["fertilizer"], (20, 20))
+        screen.blit(TOOL_ICONS["water_can"], (20, 80))
+        screen.blit(TOOL_ICONS["wheat"], (20, 140))
+        screen.blit(TOOL_ICONS["harvest"], (20, 200))
 
         # Event handling
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 1:  # Left click to fertilize, plant, or water
-                    if farm.grid[grid_y][grid_x] is None:
-                        farm.fertilize_soil(grid_x, grid_y)  # Fertilize first
-                    elif farm.grid[grid_y][grid_x] is not None:
-                        crop = farm.grid[grid_y][grid_x]
-                        if crop.state == "fertilized":
-                            farm.plant_crop(grid_x, grid_y, selected_crop)
-                        elif crop.state == "planted":
-                            farm.water_crop(grid_x, grid_y)
-                elif event.button == 3:  # Right click to harvest
-                    farm.harvest_crop(grid_x, grid_y)
+                mouse_x, mouse_y = pygame.mouse.get_pos()
+                if mouse_x < 120:  # Clicking on the sidebar
+                    if 20 <= mouse_y <= 60:
+                        selected_tool = "fertilizer"
+                    elif 80 <= mouse_y <= 120:
+                        selected_tool = "water_can"
+                    elif 140 <= mouse_y <= 180:
+                        selected_tool = "wheat"
+                    elif 200 <= mouse_y <= 240:
+                        selected_tool = "harvest"
+                else:
+                    dragging_tool = selected_tool  # Begin dragging the selected tool
+            elif event.type == pygame.MOUSEBUTTONUP:
+                if dragging_tool:
+                    # Get the grid position where the tool is dropped
+                    mouse_x, mouse_y = pygame.mouse.get_pos()
+                    grid_x, grid_y = min(mouse_x // CELL_SIZE, GRID_WIDTH - 1), min(mouse_y // CELL_SIZE, GRID_HEIGHT - 1)
 
-        # Grow crops every frame
-        farm.grow_crops()
+                    # Apply the tool action based on the tool selected
+                    if dragging_tool == "fertilizer":
+                        farm.fertilize_soil(grid_x, grid_y)
+                    elif dragging_tool == "water_can":
+                        farm.water_crop(grid_x, grid_y)
+                    elif dragging_tool == "wheat":
+                        farm.plant_crop(grid_x, grid_y, "wheat")
+                    elif dragging_tool == "harvest":
+                        farm.harvest_crop(grid_x, grid_y)
+                    dragging_tool = None
 
-        # Display instructions
-        display_message("Left click to fertilize, plant, or water. Right click to harvest.", BLACK, (10, 10))
-        display_message(f"Current crop: {selected_crop}", BLACK, (10, 40))
+        # Display the selected tool
+        display_message(f"Selected Tool: {selected_tool}", BLACK, (140, 10))
 
         # Update the screen
         pygame.display.flip()
