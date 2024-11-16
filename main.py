@@ -1,15 +1,28 @@
 import pygame
 from farm import Farm
-from settings import TOOL_ICONS, screen, font, small_font
+from settings import (
+     screen, SCREEN_WIDTH, SCREEN_HEIGHT, TOOL_ICONS, GREEN, DARK_GRAY, BLACK, WHITE, CELL_SIZE, GRID_WIDTH, GRID_HEIGHT
+)
 from sound import play_sound, stop_sound_if_expired
 from utils import display_message, display_tool_info
 
-# Initialize Pygame
-pygame.init()
+# Initialize the fullscreen state
+fullscreen = False
 
-# Explicitly initialize the font module
-pygame.font.init()
+# Load sound files
+fertilize_sound = pygame.mixer.Sound("sounds/fertilize.mp3")
+water_sound = pygame.mixer.Sound("sounds/watering.mp3")
+harvest_sound = pygame.mixer.Sound("sounds/harvest.mp3")
 
+def toggle_fullscreen():
+    global screen, fullscreen
+    if fullscreen:
+        screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))  # Switch to windowed mode
+    else:
+        screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)  # Switch to fullscreen mode
+    fullscreen = not fullscreen  # Toggle the fullscreen flag
+
+    
 def game_loop():
     farm = Farm()
     clock = pygame.time.Clock()
@@ -19,22 +32,22 @@ def game_loop():
     mouse_x, mouse_y = 0, 0
 
     while running:
+
+        # Fill the background
         screen.fill(GREEN)  # Set the background color
 
         # Draw the farm grid
         farm.draw(screen)
 
-        # Draw the sidebar
-        pygame.draw.rect(screen, DARK_GRAY, pygame.Rect(0, 0, 120, SCREEN_HEIGHT))  # Sidebar
-        screen.blit(TOOL_ICONS["fertilizer"], (20, 20))
-        screen.blit(TOOL_ICONS["water_can"], (20, 80))
-        screen.blit(TOOL_ICONS["wheat"], (20, 140))
-        screen.blit(TOOL_ICONS["harvest"], (20, 200))
-
         # Event handling
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    running = False  # Exit the game if ESC is pressed
+                elif event.key == pygame.K_f:
+                    toggle_fullscreen()  # Toggle fullscreen mode when 'F' key is pressed
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 mouse_x, mouse_y = pygame.mouse.get_pos()
                 if mouse_x < 120:  # Clicking on the sidebar
@@ -46,7 +59,7 @@ def game_loop():
                         selected_tool = "wheat"
                     elif 200 <= mouse_y <= 240:
                         selected_tool = "harvest"
-                else:
+                elif mouse_y < SCREEN_HEIGHT - 100:  # Clicking inside the grid
                     dragging_tool = selected_tool  # Begin dragging the selected tool
             elif event.type == pygame.MOUSEBUTTONUP:
                 if dragging_tool:
@@ -69,12 +82,27 @@ def game_loop():
                             play_sound(harvest_sound, "harvest")
                     dragging_tool = None
 
-        # Display the selected tool and money
-        display_message(f"Selected Tool: {selected_tool}", BLACK, (140, 10), screen)
-        display_message(f"Money: ${farm.money}", BLACK, (140, 40), screen)
+        # Update farm (this will update crop growth)
+        farm.update()
 
-        # Display tooltip for selected tool
-        display_tool_info(selected_tool, screen)
+        # Draw the sidebar
+        pygame.draw.rect(screen, DARK_GRAY, pygame.Rect(0, 0, 120, SCREEN_HEIGHT))  # Sidebar
+        screen.blit(TOOL_ICONS["fertilizer"], (20, 20))
+        screen.blit(TOOL_ICONS["water_can"], (20, 80))
+        screen.blit(TOOL_ICONS["wheat"], (20, 140))
+        screen.blit(TOOL_ICONS["harvest"], (20, 200))
+
+        # Draw the UI Section
+        ui_section_height = 100
+        ui_rect = pygame.Rect(0, SCREEN_HEIGHT - ui_section_height, SCREEN_WIDTH, ui_section_height)
+        pygame.draw.rect(screen, WHITE, ui_rect)
+
+        # Display the selected tool and money in the UI section
+        display_message(f"Selected Tool: {selected_tool}", BLACK, (140, SCREEN_HEIGHT - ui_section_height + 10), screen)
+        display_message(f"Money: ${farm.money}", BLACK, (140, SCREEN_HEIGHT - ui_section_height + 40), screen)
+
+        # Display tooltip for selected tool in the UI section
+        display_tool_info(selected_tool, screen, y_offset=SCREEN_HEIGHT - ui_section_height + 70)
 
         # Update the screen
         pygame.display.flip()
@@ -85,7 +113,19 @@ def game_loop():
         # Set the game speed (FPS)
         clock.tick(60)
 
-# Start the game loop
-if __name__ == "__main__":
-    game_loop()
     pygame.quit()
+
+    print("Game loop ended")  # Debug
+
+if __name__ == "__main__":
+    try:
+        game_loop()
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    finally:
+        print("Cleaning up resources...")  # Debug
+        pygame.display.quit()  # Close the display window
+        pygame.mixer.quit()    # Stop all sound-related resources
+        pygame.quit()          # Quit Pygame
+        print("Pygame quit successfully")  # Debug
+        exit()                 # Terminate the Python script completely
